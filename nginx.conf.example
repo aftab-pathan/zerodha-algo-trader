@@ -1,0 +1,83 @@
+# /etc/nginx/sites-available/algo-trader
+#
+# Nginx reverse proxy for Streamlit dashboard.
+# Provides: HTTPS (TLS), IP allowlisting, rate limiting, security headers.
+#
+# Setup:
+#   sudo apt install nginx certbot python3-certbot-nginx
+#   sudo certbot --nginx -d your-domain.com
+#   sudo ln -s /etc/nginx/sites-available/algo-trader /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+
+# Rate limiting zones
+limit_req_zone  $binary_remote_addr zone=login:10m  rate=5r/m;   # 5 requests/min on login
+limit_req_zone  $binary_remote_addr zone=api:10m    rate=30r/m;  # 30 requests/min general
+
+# ── OPTIONAL: Whitelist only YOUR IP ──────────────────────────────────────────
+# Uncomment and replace with your actual IP address(es).
+# This is the STRONGEST security measure — only your IP can reach the dashboard.
+#
+# geo $allowed_ip {
+#     default         0;
+#     YOUR.HOME.IP/32 1;         # your home IP
+#     YOUR.PHONE.IP/32 1;        # your mobile IP (changes — use VPN instead)
+# }
+
+server {
+    listen 80;
+    server_name YOUR_DOMAIN_OR_IP;
+
+    # Redirect all HTTP → HTTPS
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name YOUR_DOMAIN_OR_IP;
+
+    # SSL (certbot fills these in)
+    ssl_certificate     /etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options           DENY                                   always;
+    add_header X-Content-Type-Options    nosniff                                always;
+    add_header X-XSS-Protection          "1; mode=block"                        always;
+    add_header Referrer-Policy           "no-referrer"                          always;
+    add_header Content-Security-Policy   "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: wss:;" always;
+
+    # Hide Nginx version
+    server_tokens off;
+
+    # ── IP Whitelist (uncomment if using geo block above) ──────────────────
+    # if ($allowed_ip = 0) {
+    #     return 403 "Access denied.";
+    # }
+
+    # Rate limiting on all requests
+    limit_req zone=api burst=20 nodelay;
+
+    # Proxy to Streamlit
+    location / {
+        proxy_pass         http://127.0.0.1:8501;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host       $host;
+        proxy_set_header   X-Real-IP  $remote_addr;
+        proxy_read_timeout 86400;
+
+        # Extra auth layer: basic auth (optional, in addition to Streamlit login)
+        # auth_basic           "Algo Trader";
+        # auth_basic_user_file /etc/nginx/.htpasswd;
+    }
+
+    # Block common attack paths
+    location ~ /\. {
+        deny all;
+    }
+}

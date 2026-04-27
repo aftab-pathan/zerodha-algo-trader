@@ -1,0 +1,28 @@
+# ── SECRETS — NEVER COMMIT ──────────────────────────────────────
+.env
+data/access_token.enc
+data/secret.key
+
+# ── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# ── Logs & Data ───────────────────────────────────────────────────
+logs/*.log
+logs/trades.csv
+logs/audit.log
+data/state.json
+data/*.enc
+data/*.key
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
