@@ -70,12 +70,20 @@ bash deploy_oracle.sh
 ssh -i ~/.ssh/your-key.pem ubuntu@<VM_PUBLIC_IP>
 ```
 
-### **Step 2: System Update**
+### **Step 2: System Update & Python Setup**
 
 ```bash
 sudo apt-get update
 sudo apt-get upgrade -y
+
+# Ubuntu 22.04 comes with Python 3.10 - verify it's installed
+python3.10 --version
+
+# If not installed, install it
+sudo apt-get install -y python3.10 python3.10-venv python3.10-dev
 ```
+
+**Note:** Python 3.10+ is required to avoid compatibility issues. Python 3.8 is no longer supported.
 
 ### **Step 3: Clone Repository**
 
@@ -194,11 +202,11 @@ python login.py
 ### **Step 9: Test Run (Dry Run)**
 
 ```bash
-# Test standard scan (15 stocks)
-python manage.py scan --dry-run
+# Test standard scan (15 stocks) - dry run is default
+python manage.py scan
 
-# Test bulk scan (1000 stocks with two-tier Claude)
-python manage.py scan --bulk --dry-run
+# Test bulk scan (1000 stocks with two-tier Claude) - dry run is default
+python manage.py scan --bulk
 
 # Check system status
 python manage.py status
@@ -289,11 +297,11 @@ source venv/bin/activate
 # Daily login (REQUIRED - run at 8:30 AM daily)
 python login.py
 
-# Manual scans
-python manage.py scan --dry-run                    # Standard scan (dry run)
-python manage.py scan --bulk --dry-run             # Bulk scan (dry run)
-python manage.py scan --live                        # Standard scan (LIVE)
-python manage.py scan --bulk --live                 # Bulk scan (LIVE)
+# Manual scans (dry run is default - no real orders)
+python manage.py scan                              # Standard scan (dry run)
+python manage.py scan --bulk                       # Bulk scan (dry run)
+python manage.py scan --live                       # Standard scan (LIVE)
+python manage.py scan --bulk --live                # Bulk scan (LIVE)
 
 # System status
 python manage.py status
@@ -438,6 +446,70 @@ sudo apt-get autoremove -y
 ---
 
 ## 🚨 **Troubleshooting**
+
+### **Issue: Service won't start (Python 3.8 compatibility)**
+
+If you see the service failing with exit code 1:
+
+```bash
+sudo systemctl status algo-trader
+# Shows: Active: activating (auto-restart) (Result: exit-code)
+```
+
+**Check the detailed error:**
+
+```bash
+sudo journalctl -u algo-trader -n 100 --no-pager
+```
+
+**Common fixes:**
+
+**1. Python 3.8 type hint errors** (like `TypeError: unsupported operand type(s) for |`):
+
+```bash
+cd ~/zerodha-algo-trader
+git pull  # Get the Python 3.8 compatible fixes
+sudo systemctl restart algo-trader
+```
+
+**Better solution:** Upgrade to Python 3.10+ to avoid all compatibility issues:
+
+```bash
+# See PYTHON_UPGRADE.md for detailed instructions
+cd ~/zerodha-algo-trader
+sudo systemctl stop algo-trader
+rm -rf venv
+python3.10 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+sudo systemctl restart algo-trader
+```
+
+**2. Missing .env file:**
+
+```bash
+# Verify .env exists
+ls -la ~/zerodha-algo-trader/.env
+
+# If missing, create it:
+nano ~/zerodha-algo-trader/.env
+# Add your configuration (see Step 5)
+```
+
+**3. Test manually before starting service:**
+
+```bash
+cd ~/zerodha-algo-trader
+source venv/bin/activate
+
+# Test imports
+python -c "from core.trading_engine import scan_and_trade; print('OK')"
+
+# Test scheduler
+python scheduler.py
+# Press Ctrl+C after seeing startup logs
+```
 
 ### **Issue: Service won't start**
 

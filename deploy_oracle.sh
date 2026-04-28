@@ -8,7 +8,7 @@
 set -e
 APP_DIR="/home/ubuntu/zerodha-algo-trader"
 SERVICE_NAME="algo-trader"
-PYTHON="/usr/bin/python3"
+PYTHON="/usr/bin/python3.10"
 
 echo ""
 echo "══════════════════════════════════════════"
@@ -20,7 +20,8 @@ echo ""
 # ── 1. System packages ────────────────────────────────────────────
 echo "[1/8] Installing system packages..."
 sudo apt-get update -qq
-sudo apt-get install -y python3 python3-pip python3-venv git ufw fail2ban htop curl
+sudo apt-get install -y python3.10 python3.10-pip python3.10-venv python3.10-dev git ufw fail2ban htop curl
+echo "  ✓ Python 3.10 installed"
 
 # ── 2. Firewall (block everything except SSH) ─────────────────────
 echo "[2/8] Configuring firewall..."
@@ -56,8 +57,8 @@ cd $APP_DIR
 
 # Virtual environment
 if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    echo "  ✓ Virtual environment created"
+    python3.10 -m venv venv
+    echo "  ✓ Virtual environment created (Python 3.10)"
 fi
 
 source venv/bin/activate
