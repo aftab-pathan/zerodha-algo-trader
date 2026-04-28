@@ -9,6 +9,7 @@ import time
 import logging
 import pandas as pd
 from datetime import datetime, timedelta
+from typing import Optional
 from kiteconnect import KiteConnect, KiteTicker
 from config.config import (
     KITE_API_KEY, KITE_API_SECRET, EXCHANGE,
@@ -17,7 +18,7 @@ from config.config import (
 from utils.security import save_access_token, load_access_token, audit_log
 
 logger = logging.getLogger(__name__)
-_kite: KiteConnect | None = None
+_kite: Optional[KiteConnect] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ def get_quote(symbol: str) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def place_order(symbol: str, transaction_type: str, quantity: int,
-                price: float = 0, order_type: str = "MARKET") -> str | None:
+                price: float = 0, order_type: str = "MARKET") -> Optional[str]:
     """
     Place a CNC order. Returns order_id or None on failure.
     transaction_type: "BUY" or "SELL"
@@ -186,7 +187,7 @@ def place_order(symbol: str, transaction_type: str, quantity: int,
 
 
 def place_gtt_oco(symbol: str, quantity: int, entry_price: float,
-                  stop_loss: float, target: float) -> str | None:
+                  stop_loss: float, target: float) -> Optional[str]:
     """
     Place GTT (Good Till Triggered) OCO order — auto SL + Target.
     Remains active even if your system is offline.
@@ -273,7 +274,7 @@ def get_watchlists() -> list:
         return []
 
 
-def get_or_create_watchlist(name: str = "AlgoTrader Picks") -> int | None:
+def get_or_create_watchlist(name: str = "AlgoTrader Picks") -> Optional[int]:
     """Get watchlist ID by name, or create it if it doesn't exist."""
     kite = get_kite()
     try:

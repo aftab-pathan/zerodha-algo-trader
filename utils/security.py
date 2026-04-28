@@ -9,6 +9,7 @@ import base64
 import hashlib
 import logging
 from datetime import datetime
+from typing import Optional
 from cryptography.fernet import Fernet
 from config.config import TOKEN_FILE, DATA_DIR, LOG_DIR
 
@@ -47,7 +48,7 @@ def save_access_token(token: str) -> None:
     logger.info("Access token saved (encrypted).")
 
 
-def load_access_token() -> str | None:
+def load_access_token() -> Optional[str]:
     """Load and decrypt the saved access token. Returns None if not found."""
     if not os.path.exists(TOKEN_FILE):
         return None

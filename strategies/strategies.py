@@ -10,6 +10,7 @@ import logging
 import numpy as np
 import pandas as pd
 import anthropic
+from typing import List, Dict, Optional
 from ta.momentum  import RSIIndicator
 from ta.trend     import MACD, EMAIndicator, ADXIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
@@ -420,7 +421,7 @@ STRATEGY_MAP = {
 
 
 def run_strategies(df: pd.DataFrame, symbol: str,
-                   active_strategies: list) -> list[dict]:
+                   active_strategies: list) -> List[Dict]:
     """
     Run all active strategies on a symbol.
     Returns list of results above MIN_CONFIDENCE.
@@ -446,7 +447,7 @@ def run_strategies(df: pd.DataFrame, symbol: str,
     return results
 
 
-def get_consensus_signal(signals: list[dict]) -> dict | None:
+def get_consensus_signal(signals: List[Dict]) -> Optional[Dict]:
     """
     If multiple strategies agree on the same signal, boost confidence.
     Returns the best (highest confidence) signal, or None.
