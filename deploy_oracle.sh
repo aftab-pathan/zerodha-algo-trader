@@ -20,7 +20,7 @@ echo ""
 # ── 1. System packages ────────────────────────────────────────────
 echo "[1/8] Installing system packages..."
 sudo apt-get update -qq
-sudo apt-get install -y python3.10 python3.10-pip python3.10-venv python3.10-dev git ufw fail2ban htop curl
+sudo apt-get install -y python3.10 python3.10-venv python3.10-dev python3-pip git ufw fail2ban htop curl
 echo "  ✓ Python 3.10 installed"
 
 # ── 2. Firewall (block everything except SSH) ─────────────────────

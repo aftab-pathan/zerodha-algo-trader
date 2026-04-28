@@ -79,11 +79,11 @@ sudo apt-get upgrade -y
 # Ubuntu 22.04 comes with Python 3.10 - verify it's installed
 python3.10 --version
 
-# If not installed, install it
-sudo apt-get install -y python3.10 python3.10-venv python3.10-dev
+# If not installed, install it (note: python3-pip, not python3.10-pip)
+sudo apt-get install -y python3.10 python3.10-venv python3.10-dev python3-pip
 ```
 
-**Note:** Python 3.10+ is required to avoid compatibility issues. Python 3.8 is no longer supported.
+**Note:** Python 3.10+ is recommended for best compatibility. Works with Python 3.8+ but may show deprecation warnings.
 
 ### **Step 3: Clone Repository**
 

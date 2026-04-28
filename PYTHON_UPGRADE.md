@@ -55,7 +55,7 @@ If `python3.10 --version` fails, install it:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y python3.10 python3.10-venv python3.10-dev
+sudo apt-get install -y python3.10 python3.10-venv python3.10-dev python3-pip
 ```
 
 Then follow the steps above to recreate the virtual environment.
