@@ -4,6 +4,8 @@ core/risk_manager.py  (v2 — Production Grade)
 Institutional-level risk parameters used by prop desks and hedge funds.
 Every parameter is configurable via .env.
 
+Supports LIVE and PAPER trading modes - uses paper capital when PAPER_TRADING_MODE=true.
+
 Parameters implemented:
   - Position sizing (ATR-based + capital-based, 3-method minimum)
   - Max drawdown circuit breaker (daily / weekly / total)
@@ -23,7 +25,8 @@ from datetime import date
 
 from config.config import (
     TRADING_CAPITAL, MAX_RISK_PER_TRADE, MAX_OPEN_POSITIONS,
-    MAX_CAPITAL_DEPLOY, MIN_RISK_REWARD
+    MAX_CAPITAL_DEPLOY, MIN_RISK_REWARD, PAPER_TRADING_MODE,
+    PAPER_TRADING_CAPITAL
 )
 
 logger = logging.getLogger(__name__)
@@ -255,8 +258,21 @@ def calculate_position_size(
 
 
 def get_capital_summary(current_capital: float = None) -> dict:
-    c = current_capital or TRADING_CAPITAL
+    # Determine capital based on mode
+    if current_capital is None:
+        if PAPER_TRADING_MODE:
+            c = PAPER_TRADING_CAPITAL
+            mode_label = "[PAPER MODE]"
+            logger.info(f"[PAPER MODE] Using paper capital: ₹{c:,.2f}")
+        else:
+            c = TRADING_CAPITAL
+            mode_label = "[LIVE MODE]"
+    else:
+        c = current_capital
+        mode_label = "[PAPER MODE]" if PAPER_TRADING_MODE else "[LIVE MODE]"
+    
     return {
+        "mode": mode_label,
         "total_capital":          round(c, 2),
         "max_deployable":         round(c * MAX_CAPITAL_DEPLOY, 2),
         "max_risk_per_trade_inr": round(c * MAX_RISK_PER_TRADE, 2),

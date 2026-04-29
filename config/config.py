@@ -30,6 +30,12 @@ MAX_CAPITAL_DEPLOY  = float(os.getenv("MAX_CAPITAL_DEPLOY", "0.80")) # use max 8
 MIN_CONFIDENCE      = float(os.getenv("MIN_CONFIDENCE", "7.0"))      # Claude min score
 MIN_RISK_REWARD     = float(os.getenv("MIN_RISK_REWARD", "2.0"))     # 1:2 minimum
 
+# ─── Paper Trading Configuration ──────────────────────────────────────────────
+PAPER_TRADING_MODE     = os.getenv("PAPER_TRADING_MODE", "False").lower() in ("true", "1", "yes")
+PAPER_TRADING_CAPITAL  = float(os.getenv("PAPER_TRADING_CAPITAL", str(TRADING_CAPITAL)))  # Default to same as live capital
+PAPER_SLIPPAGE_PCT     = float(os.getenv("PAPER_SLIPPAGE_PCT", "0.002"))  # 0.2% slippage simulation
+PAPER_FILL_DELAY       = int(os.getenv("PAPER_FILL_DELAY", "3"))  # Seconds delay for order fills
+
 # ─── Exchange & Product Settings ─────────────────────────────────────────────
 EXCHANGE            = "NSE"
 PRODUCT_TYPE        = "CNC"      # CNC = delivery (swing trading)

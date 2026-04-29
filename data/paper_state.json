@@ -1,0 +1,12 @@
+{
+  "open_positions": {},
+  "pending_orders": {},
+  "closed_positions": [],
+  "orders": {},
+  "gtt_orders": {},
+  "total_pnl": 0.0,
+  "paper_capital": 50000.0,
+  "last_sync": null,
+  "order_counter": 1000,
+  "gtt_counter": 5000
+}

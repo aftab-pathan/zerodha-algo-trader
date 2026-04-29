@@ -31,7 +31,7 @@ import plotly.express as px
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.config import TRADING_CAPITAL, ACTIVE_STRATEGIES, DEFAULT_WATCHLIST, DATA_DIR, LOG_DIR
+from config.config import TRADING_CAPITAL, ACTIVE_STRATEGIES, DEFAULT_WATCHLIST, DATA_DIR, LOG_DIR, PAPER_TRADING_MODE
 from core.risk_manager import get_capital_summary
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +110,15 @@ def load_state() -> dict:
         with open(state_file) as f:
             return json.load(f)
     return {"open_positions": {}, "closed_positions": [], "total_pnl": 0}
+
+@st.cache_data(ttl=10)   # refresh every 10 seconds
+def load_paper_state() -> dict:
+    """Load paper trading state"""
+    paper_state_file = os.path.join(DATA_DIR, "paper_state.json")
+    if os.path.exists(paper_state_file):
+        with open(paper_state_file) as f:
+            return json.load(f)
+    return {"open_positions": {}, "closed_positions": [], "total_pnl": 0, "paper_capital": 50000}
 
 @st.cache_data(ttl=300)
 def load_trades() -> pd.DataFrame:
@@ -485,6 +494,265 @@ def page_logs():
         st.code("".join(lines), language="text")
 
 
+def page_paper_trading():
+    """Paper Trading Dashboard - View paper trading performance and compare with live"""
+    st.header("📝 Paper Trading Dashboard")
+    
+    # Mode indicator
+    current_mode = "🟡 PAPER MODE" if PAPER_TRADING_MODE else "🔴 LIVE MODE"
+    st.markdown(f"**Current System Mode:** {current_mode}")
+    st.markdown("---")
+    
+    # Refresh button
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.button("🔄 Refresh", help="Reload data from files"):
+            st.cache_data.clear()
+            st.rerun()
+    
+    # Load both paper and live data for comparison
+    paper_state = load_paper_state()
+    live_state = load_state()
+    
+    paper_open = paper_state.get("open_positions", {})
+    paper_closed = paper_state.get("closed_positions", [])
+    paper_pnl = paper_state.get("total_pnl", 0)
+    paper_capital = paper_state.get("paper_capital", 50000)
+    
+    live_open = live_state.get("open_positions", {})
+    live_closed = live_state.get("closed_positions", [])
+    live_pnl = live_state.get("total_pnl", 0)
+    
+    # === KPI Comparison ===
+    st.subheader("📊 Paper vs Live Comparison")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "💰 Paper Capital",
+            f"₹{paper_capital:,.0f}",
+            delta=f"{(paper_pnl/paper_capital*100):.2f}%" if paper_capital > 0 else "0%"
+        )
+        st.metric(
+            "💵 Live Capital",
+            f"₹{TRADING_CAPITAL:,.0f}",
+            delta=f"{(live_pnl/TRADING_CAPITAL*100):.2f}%" if TRADING_CAPITAL > 0 else "0%"
+        )
+    
+    with col2:
+        st.metric("📂 Paper Open", len(paper_open))
+        st.metric("📂 Live Open", len(live_open))
+    
+    with col3:
+        st.metric("✅ Paper Closed", len(paper_closed))
+        st.metric("✅ Live Closed", len(live_closed))
+    
+    with col4:
+        st.metric(
+            "💵 Paper P&L",
+            f"₹{paper_pnl:+,.0f}",
+            delta_color="normal" if paper_pnl >= 0 else "inverse"
+        )
+        st.metric(
+            "💵 Live P&L",
+            f"₹{live_pnl:+,.0f}",
+            delta_color="normal" if live_pnl >= 0 else "inverse"
+        )
+    
+    st.markdown("---")
+    
+    # === Paper Trading Statistics ===
+    st.subheader("📈 Paper Trading Performance")
+    
+    if len(paper_closed) > 0:
+        # Calculate paper metrics
+        winning_paper = sum(1 for t in paper_closed if t.get("realised_pnl", 0) > 0)
+        losing_paper = sum(1 for t in paper_closed if t.get("realised_pnl", 0) < 0)
+        paper_win_rate = (winning_paper / len(paper_closed) * 100) if len(paper_closed) > 0 else 0
+        
+        total_wins_paper = sum(t["realised_pnl"] for t in paper_closed if t.get("realised_pnl", 0) > 0)
+        total_losses_paper = abs(sum(t["realised_pnl"] for t in paper_closed if t.get("realised_pnl", 0) < 0))
+        
+        avg_win_paper = total_wins_paper / winning_paper if winning_paper > 0 else 0
+        avg_loss_paper = total_losses_paper / losing_paper if losing_paper > 0 else 0
+        profit_factor_paper = total_wins_paper / total_losses_paper if total_losses_paper > 0 else 0
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("Win Rate", f"{paper_win_rate:.1f}%")
+        col2.metric("Wins", winning_paper)
+        col3.metric("Losses", losing_paper)
+        col4.metric("Avg Win", f"₹{avg_win_paper:,.0f}")
+        col5.metric("Profit Factor", f"{profit_factor_paper:.2f}")
+    else:
+        st.info("No paper trades closed yet. Start paper trading to see statistics.")
+    
+    st.markdown("---")
+    
+    # === Tabs for different views ===
+    tab1, tab2, tab3, tab4 = st.tabs(["📂 Open Positions", "✅ Closed Trades", "📊 P&L Chart", "⚙️ Settings"])
+    
+    with tab1:
+        st.subheader("🟡 Paper Trading Open Positions")
+        if paper_open:
+            rows = []
+            for sym, p in paper_open.items():
+                unrealized_pnl = p.get("unrealised_pnl", 0)
+                rows.append({
+                    "Symbol": sym,
+                    "Signal": p.get("signal", ""),
+                    "Entry ₹": p.get("entry", 0),
+                    "Current ₹": p.get("current_price", p.get("entry", 0)),
+                    "SL ₹": p.get("stop_loss", 0),
+                    "Target ₹": p.get("target", 0),
+                    "Qty": p.get("quantity", 0),
+                    "Unrealized P&L": f"₹{unrealized_pnl:+,.0f}",
+                    "Date": p.get("date", "")[:10]
+                })
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No open paper positions.")
+        
+        st.markdown("---")
+        
+        st.subheader("🔴 Live Trading Open Positions")
+        if live_open:
+            rows = []
+            for sym, p in live_open.items():
+                rows.append({
+                    "Symbol": sym,
+                    "Signal": p.get("signal", ""),
+                    "Entry ₹": p.get("entry", 0),
+                    "SL ₹": p.get("stop_loss", 0),
+                    "Target ₹": p.get("target", 0),
+                    "Qty": p.get("quantity", 0),
+                    "Date": p.get("date", "")[:10]
+                })
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No open live positions.")
+    
+    with tab2:
+        st.subheader("✅ Paper Trading Closed Trades")
+        if paper_closed:
+            rows = []
+            for trade in paper_closed:
+                rows.append({
+                    "Symbol": trade.get("symbol", ""),
+                    "Signal": trade.get("signal", ""),
+                    "Entry ₹": trade.get("entry", 0),
+                    "Exit ₹": trade.get("exit_price", 0),
+                    "Qty": trade.get("quantity", 0),
+                    "P&L": f"₹{trade.get('realised_pnl', 0):+,.0f}",
+                    "Exit Type": trade.get("exit_type", ""),
+                    "Date": trade.get("exit_date", "")[:10]
+                })
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            
+            # Download button
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Paper Trades CSV",
+                data=csv,
+                file_name=f"paper_trades_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("No paper trades closed yet.")
+    
+    with tab3:
+        st.subheader("📊 Cumulative P&L Comparison")
+        
+        # Build cumulative P&L data for paper trading
+        if paper_closed:
+            paper_df = pd.DataFrame(paper_closed)
+            paper_df["exit_date"] = pd.to_datetime(paper_df["exit_date"])
+            paper_df = paper_df.sort_values("exit_date")
+            paper_df["cumulative_pnl"] = paper_df["realised_pnl"].cumsum()
+            
+            # Create chart
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=paper_df["exit_date"],
+                y=paper_df["cumulative_pnl"],
+                mode='lines+markers',
+                name='Paper P&L',
+                line=dict(color='orange', width=2),
+                fill='tozeroy'
+            ))
+            
+            # Add live P&L if available
+            if live_closed:
+                live_df = pd.DataFrame(live_closed)
+                if "exit_date" in live_df.columns:
+                    live_df["exit_date"] = pd.to_datetime(live_df["exit_date"])
+                    live_df = live_df.sort_values("exit_date")
+                    live_df["cumulative_pnl"] = live_df["realised_pnl"].cumsum()
+                    
+                    fig.add_trace(go.Scatter(
+                        x=live_df["exit_date"],
+                        y=live_df["cumulative_pnl"],
+                        mode='lines+markers',
+                        name='Live P&L',
+                        line=dict(color='green', width=2),
+                        fill='tozeroy'
+                    ))
+            
+            fig.update_layout(
+                title="Cumulative P&L: Paper vs Live",
+                xaxis_title="Date",
+                yaxis_title="P&L (₹)",
+                hovermode='x unified',
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No paper trade data to display chart.")
+    
+    with tab4:
+        st.subheader("⚙️ Paper Trading Settings")
+        
+        st.markdown(f"**Current Mode:** {current_mode}")
+        st.markdown(f"**Paper Capital:** ₹{paper_capital:,.2f}")
+        st.markdown(f"**Live Capital:** ₹{TRADING_CAPITAL:,.2f}")
+        
+        st.markdown("---")
+        
+        st.markdown("### 🔄 Switch Trading Mode")
+        st.warning(
+            "⚠️ To switch between paper and live trading:\n\n"
+            "1. Edit `.env` file\n"
+            "2. Set `PAPER_TRADING_MODE=true` for paper mode\n"
+            "3. Set `PAPER_TRADING_MODE=false` for live mode\n"
+            "4. Restart the trading engine\n\n"
+            "**Never run both modes simultaneously on the same system!**"
+        )
+        
+        st.markdown("---")
+        
+        st.markdown("### 🗑️ Reset Paper Trading Data")
+        st.warning(
+            "⚠️ **Danger Zone**: This will permanently delete all paper trading data "
+            "(positions, trades, P&L history). Live trading data is NOT affected."
+        )
+        
+        if st.button("🗑️ Reset Paper Trading Data", type="secondary"):
+            try:
+                from core.paper_sync_engine import reset_paper_trading
+                if reset_paper_trading():
+                    st.success("✅ Paper trading data reset successfully!")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("Not in paper trading mode. Cannot reset.")
+            except Exception as e:
+                st.error(f"Error resetting paper data: {e}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main App
 # ─────────────────────────────────────────────────────────────────────────────
@@ -504,12 +772,14 @@ def main():
     # Sidebar
     with st.sidebar:
         st.markdown("## 📈 Algo Trader")
+        mode_indicator = "🟡 PAPER MODE" if PAPER_TRADING_MODE else "🔴 LIVE MODE"
         st.markdown(f"**Capital:** ₹{TRADING_CAPITAL:,.0f}")
-        st.markdown(f"**Mode:** {'🟡 DRY RUN' if os.getenv('DRY_RUN','true').lower()=='true' else '🔴 LIVE'}")
+        st.markdown(f"**Mode:** {mode_indicator}")
         st.markdown("---")
 
         page = st.radio("Navigate", [
             "📊 Overview",
+            "📝 Paper Trading",
             "📈 P&L Analytics",
             "🔬 Backtesting",
             "⚙️ Capital & Risk",
@@ -530,6 +800,7 @@ def main():
 
     # Route
     if   "Overview"   in page: page_overview()
+    elif "Paper"      in page: page_paper_trading()
     elif "P&L"        in page: page_pnl()
     elif "Backtest"   in page: page_backtest()
     elif "Capital"    in page: page_capital()

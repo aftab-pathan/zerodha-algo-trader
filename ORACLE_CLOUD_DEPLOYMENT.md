@@ -170,16 +170,25 @@ curl ifconfig.me
 
 **Without this step:** You'll get "No IPs configured" error when placing orders.
 
-### **Step 7: Create Kite Watchlist**
+### **Step 7: Watchlist Management (Manual)**
 
-**On Kite app or web (https://kite.zerodha.com):**
+**⚠️ Important:** Kite Connect API v5+ does not support automatic watchlist management. You'll need to manually add shortlisted stocks to your Kite watchlist.
 
-1. Go to **Watchlists**
-2. Create new watchlist
-3. Name it: **AlgoTrader Picks** (exact name)
-4. Leave it empty - the algo will populate it
+**Setup:**
 
-**Why needed:** Kite API doesn't support programmatic watchlist creation.
+1. Go to https://kite.zerodha.com
+2. Create a watchlist named **"AlgoTrader Picks"** (optional - for your tracking)
+3. After each scan, check **Telegram notifications** or **logs** for shortlisted stocks
+4. Manually add them to your watchlist if desired
+
+**Note:** The algo will still:
+
+- ✅ Scan stocks automatically
+- ✅ Generate signals
+- ✅ Place orders automatically (if not in dry run mode)
+- ❌ Cannot auto-update Kite watchlist (API limitation)
+
+The watchlist is only for your visual tracking on Kite - it doesn't affect algo functionality.
 
 ### **Step 8: Initial Login**
 
@@ -572,12 +581,24 @@ curl ifconfig.me
 
 ### **Issue: Watchlist errors**
 
+**Note:** Kite Connect API v5+ does not support automatic watchlist management.
+
+The algo will log shortlisted stocks in:
+
+- Telegram notifications
+- Log files: `~/zerodha-algo-trader/logs/scheduler.log`
+- Console output
+
+**To track signals:**
+
 ```bash
-# Error: 'AlgoTrader Picks' not found
-# Solution: Create it manually in Kite app
+# View shortlisted stocks from last scan
+grep "Shortlisted" ~/zerodha-algo-trader/logs/scheduler.log | tail -20
+
+# Or check Telegram for notifications
 ```
 
-Go to https://kite.zerodha.com → Watchlists → Create "AlgoTrader Picks"
+You can manually add these stocks to any Kite watchlist for visual tracking.
 
 ### **Issue: Scan taking too long**
 
@@ -672,9 +693,9 @@ Before going live with real money:
 - [ ] `.env` configured with real credentials
 - [ ] `.env` file secured (chmod 600)
 - [ ] IP whitelisted in Kite Connect console
-- [ ] "AlgoTrader Picks" watchlist created in Kite
 - [ ] `TRADE_DIRECTION=BUY` for BUY-only trading
 - [ ] `DRY_RUN=true` initially for testing
+- [ ] Understand that watchlist updates are manual (API limitation)
 
 **Testing:**
 
@@ -685,6 +706,7 @@ Before going live with real money:
 - [ ] Service started and running
 - [ ] Logs monitored for errors
 - [ ] Tested position management
+- [ ] Understand watchlist must be updated manually (API limitation)
 
 **Go-Live:**
 

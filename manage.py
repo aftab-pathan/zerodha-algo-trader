@@ -121,15 +121,29 @@ def cmd_positions(args):
 
 def cmd_watchlist(args):
     """Show or refresh Zerodha watchlist."""
-    from core.kite_client import get_watchlists, clear_watchlist, add_to_watchlist
+    from core.kite_client import get_watchlists, add_to_watchlist
     from config.config import DEFAULT_WATCHLIST
-    if args.refresh:
-        clear_watchlist()
-        added = add_to_watchlist(DEFAULT_WATCHLIST)
-        print(f"\n✅ Refreshed watchlist with {len(added)} stocks: {added}\n")
+    
+    print("\n⚠️  IMPORTANT: Kite Connect API v5+ does not support watchlist management\n")
+    print("Zerodha removed this feature from the API for security reasons.")
+    print("You must manually update watchlists through Kite web/app.\n")
+    
+    if args.test:
+        print("📋 To manually add stocks to your watchlist:")
+        print("   1. Go to https://kite.zerodha.com")
+        print("   2. Create/open watchlist 'AlgoTrader Picks'")
+        print("   3. After each scan, check Telegram or logs for shortlisted stocks")
+        print("   4. Add them manually to your watchlist\n")
+        print("💡 The algo will still find signals and place orders automatically,")
+        print("   but watchlist sync must be done manually.\n")
+        
+    elif args.refresh:
+        print(f"📝 Stocks to add manually: {DEFAULT_WATCHLIST}\n")
+        print("   Copy these symbols and add them to your Kite watchlist manually.\n")
     else:
-        wls = get_watchlists()
-        print(f"\nYour Zerodha watchlists: {json.dumps(wls, indent=2)}\n")
+        print("Available commands:")
+        print("  python manage.py watchlist --test     # Show manual instructions")
+        print("  python manage.py watchlist --refresh  # Show default watchlist stocks\n")
 
 
 def cmd_summary():
@@ -161,6 +175,8 @@ def main():
     p_wl = sub.add_parser("watchlist", help="Manage Zerodha watchlist")
     p_wl.add_argument("--refresh", action="store_true",
                       help="Clear and re-add default watchlist")
+    p_wl.add_argument("--test", action="store_true",
+                      help="Test watchlist setup and functionality")
 
     sub.add_parser("summary", help="Send daily summary to Telegram")
 

@@ -1,26 +1,36 @@
 """
 utils/telegram_notifier.py
 Sends trade alerts, daily summaries, and error notifications via Telegram.
+Supports PAPER and LIVE trading modes with visual indicators.
 """
 
 import logging
 import requests
 from datetime import datetime
-from config.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from config.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, PAPER_TRADING_MODE
 
 logger = logging.getLogger(__name__)
 
 BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 
+def _get_mode_prefix() -> str:
+    """Get mode prefix for all messages"""
+    return "🟡 [PAPER] " if PAPER_TRADING_MODE else "🔴 [LIVE] "
+
+
 def _send(text: str, parse_mode: str = "HTML") -> bool:
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         logger.warning("Telegram not configured, skipping notification.")
         return False
+    
+    # Add mode prefix to all messages
+    prefixed_text = _get_mode_prefix() + text
+    
     try:
         resp = requests.post(
             f"{BASE_URL}/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": parse_mode},
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": prefixed_text, "parse_mode": parse_mode},
             timeout=10
         )
         resp.raise_for_status()
@@ -104,10 +114,23 @@ def notify_daily_summary(stats: dict) -> None:
 
 
 def notify_watchlist_updated(added: list, total: int) -> None:
+    """
+    Notify about shortlisted stocks.
+    Note: Kite API v5+ doesn't support watchlist management,
+    so this just notifies about stocks that should be added manually.
+    """
+    if not added:
+        return
+    
+    stocks_list = ', '.join(added[:10])
+    if len(added) > 10:
+        stocks_list += f" +{len(added)-10} more"
+    
     _send(
-        f"📋 <b>WATCHLIST UPDATED</b>\n"
-        f"Added {len(added)} stocks: {', '.join(added[:10])}\n"
-        f"Total watchlist stocks: {total}"
+        f"📋 <b>SHORTLISTED STOCKS</b>\n"
+        f"Found {len(added)} signals: {stocks_list}\n\n"
+        f"⚠️ <i>Note: Add these manually to your Kite watchlist</i>\n"
+        f"<i>(API doesn't support auto-update)</i>"
     )
 
 

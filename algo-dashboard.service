@@ -1,0 +1,18 @@
+[Unit]
+Description=Zerodha Algo Trader Dashboard (Streamlit)
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/zerodha-algo-trader
+Environment="PATH=/home/YOUR_USERNAME/zerodha-algo-trader/venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/YOUR_USERNAME/zerodha-algo-trader/venv/bin/streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=algo-dashboard
+
+[Install]
+WantedBy=multi-user.target

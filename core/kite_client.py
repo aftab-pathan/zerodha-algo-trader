@@ -2,6 +2,8 @@
 core/kite_client.py
 Zerodha Kite Connect wrapper with auto-reconnect, rate limiting,
 watchlist management, and order execution.
+
+Supports both LIVE and PAPER trading modes via PAPER_TRADING_MODE toggle.
 """
 
 import os
@@ -9,30 +11,49 @@ import time
 import logging
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Union
 from kiteconnect import KiteConnect, KiteTicker
 from config.config import (
     KITE_API_KEY, KITE_API_SECRET, EXCHANGE,
-    PRODUCT_TYPE, ORDER_VALIDITY, DATA_DIR
+    PRODUCT_TYPE, ORDER_VALIDITY, DATA_DIR, PAPER_TRADING_MODE
 )
 from utils.security import save_access_token, load_access_token, audit_log
 
 logger = logging.getLogger(__name__)
-_kite: Optional[KiteConnect] = None
+_kite: Optional[Union[KiteConnect, 'PaperTradingClient']] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Authentication
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_kite() -> KiteConnect:
+def get_kite() -> Union[KiteConnect, 'PaperTradingClient']:
+    """
+    Get KiteConnect client (live or paper mode based on PAPER_TRADING_MODE).
+    Returns PaperTradingClient if PAPER_TRADING_MODE=true, else real KiteConnect.
+    """
     global _kite
     if _kite is None:
-        _kite = KiteConnect(api_key=KITE_API_KEY)
-        token = load_access_token()
-        if token:
-            _kite.set_access_token(token)
+        if PAPER_TRADING_MODE:
+            # Import here to avoid circular dependency
+            from core.paper_trading_client import PaperTradingClient
+            _kite = PaperTradingClient(api_key=KITE_API_KEY)
+            token = load_access_token()
+            if token:
+                _kite.set_access_token(token)
+            logger.warning("🟡 PAPER TRADING MODE ACTIVE - No real trades will be placed")
+        else:
+            _kite = KiteConnect(api_key=KITE_API_KEY)
+            token = load_access_token()
+            if token:
+                _kite.set_access_token(token)
+            logger.info("🔴 LIVE TRADING MODE ACTIVE - Real trades will be placed")
     return _kite
+
+
+def is_paper_mode() -> bool:
+    """Check if system is in paper trading mode"""
+    return PAPER_TRADING_MODE
 
 
 def get_login_url() -> str:
@@ -264,67 +285,57 @@ def get_portfolio_value() -> float:
 # ─────────────────────────────────────────────────────────────────────────────
 # Watchlist Management
 # ─────────────────────────────────────────────────────────────────────────────
+# NOTE: Kite Connect API v5+ does not support watchlist management
+# Users must manually update watchlists through Kite web/app
+# ─────────────────────────────────────────────────────────────────────────────
 
 def get_watchlists() -> list:
-    """Fetch all watchlists from Kite."""
-    try:
-        return get_kite().watchlists()
-    except Exception as e:
-        logger.error(f"Failed to fetch watchlists: {e}")
-        return []
+    """
+    Fetch all watchlists from Kite.
+    NOTE: This feature is not available in Kite Connect API v5+.
+    """
+    logger.warning("⚠️  Watchlist API is not supported in Kite Connect v5+")
+    logger.warning("   Please manage watchlists manually at https://kite.zerodha.com")
+    return []
 
 
 def get_or_create_watchlist(name: str = "AlgoTrader Picks") -> Optional[int]:
-    """Get watchlist ID by name, or create it if it doesn't exist."""
-    kite = get_kite()
-    try:
-        watchlists = kite.watchlists()
-        for wl in watchlists:
-            if wl.get("name") == name:
-                return wl["id"]
-        # Create new - Note: Kite API doesn't support programmatic watchlist creation
-        # Users must create "AlgoTrader Picks" watchlist manually in Kite app
-        logger.warning(f"Watchlist '{name}' not found. Please create it manually in Kite app.")
-        return None
-    except Exception as e:
-        logger.error(f"Watchlist create/get failed: {e}")
-        return None
+    """
+    Get watchlist ID by name, or create it if it doesn't exist.
+    NOTE: This feature is not available in Kite Connect API v5+.
+    """
+    logger.warning(f"⚠️  Watchlist management not supported in Kite Connect API v5+")
+    logger.warning(f"   Shortlisted symbols will be logged but not added to Kite watchlist")
+    logger.warning(f"   You can manually add them at: https://kite.zerodha.com")
+    return None
 
 
 def add_to_watchlist(symbols: list, watchlist_name: str = "AlgoTrader Picks") -> list:
-    """Add shortlisted symbols to Zerodha watchlist. Returns actually-added list."""
-    kite = get_kite()
-    wl_id = get_or_create_watchlist(watchlist_name)
-    if not wl_id:
+    """
+    Add shortlisted symbols to Zerodha watchlist.
+    NOTE: Kite Connect API v5+ does not support watchlist management.
+    This function will log the symbols that would be added.
+    """
+    if not symbols:
         return []
-
-    added = []
-    for symbol in symbols:
-        try:
-            token = get_token(symbol)
-            kite.add_watchlist_item(wl_id, token)
-            added.append(symbol)
-            time.sleep(0.3)   # rate limit: avoid 429s
-        except Exception as e:
-            logger.warning(f"Could not add {symbol} to watchlist: {e}")
-
-    logger.info(f"Added {len(added)} symbols to watchlist '{watchlist_name}'")
-    return added
+    
+    logger.warning(f"⚠️  Watchlist API not supported - cannot auto-update Kite watchlist")
+    logger.info(f"📋 Shortlisted symbols (add manually to Kite):")
+    for i, symbol in enumerate(symbols, 1):
+        logger.info(f"   {i}. {symbol}")
+    
+    logger.info(f"\n   → Go to https://kite.zerodha.com")
+    logger.info(f"   → Open watchlist '{watchlist_name}'")
+    logger.info(f"   → Add these {len(symbols)} stocks manually\n")
+    
+    # Return empty list since we can't actually add them
+    return []
 
 
 def clear_watchlist(watchlist_name: str = "AlgoTrader Picks") -> bool:
-    """Clear all items from the algo watchlist (refresh daily)."""
-    kite = get_kite()
-    wl_id = get_or_create_watchlist(watchlist_name)
-    if not wl_id:
-        logger.warning(f"Watchlist '{watchlist_name}' not found, skipping clear")
-        return False
-    try:
-        items = kite.watchlist(wl_id)
-        for item in items:
-            kite.delete_watchlist_item(wl_id, item["instrument_token"])
-            time.sleep(0.2)
-        return True
-    except Exception as e:
-        logger.error(f"Failed to clear watchlist: {e}")
-        return False
+    """
+    Clear all items from the algo watchlist.
+    NOTE: This feature is not available in Kite Connect API v5+.
+    """
+    logger.warning(f"⚠️  Watchlist management not supported in Kite Connect v5+")
+    return False

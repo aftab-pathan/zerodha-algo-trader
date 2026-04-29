@@ -85,6 +85,22 @@ def job_health_check():
     logger.info(f"Health check: Kite = {status}")
 
 
+def job_paper_sync():
+    """Sync paper trading positions - process pending orders and GTT triggers."""
+    from config.config import PAPER_TRADING_MODE
+    if not PAPER_TRADING_MODE:
+        logger.debug("Not in paper mode, skipping paper sync")
+        return
+    
+    logger.info("━━━ PAPER TRADING SYNC STARTING ━━━")
+    from core.paper_sync_engine import sync_paper_positions
+    try:
+        sync_paper_positions()
+        logger.info("Paper trading sync completed")
+    except Exception as e:
+        logger.error(f"Paper trading sync failed: {e}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Error handler
 # ─────────────────────────────────────────────────────────────────────────────
@@ -137,9 +153,14 @@ def start():
     scheduler.add_job(job_health_check, "interval", hours=1,
                       id="health_check")
 
+    # Paper trading sync — every 5 minutes (only runs if PAPER_TRADING_MODE=true)
+    scheduler.add_job(job_paper_sync, "interval", minutes=5,
+                      id="paper_sync")
+
     notify_startup()
     logger.info("Scheduler started. Press Ctrl+C to stop.")
     logger.info(f"Jobs: morning={SCAN_TIME_MORNING}, eod={SCAN_TIME_EOD} IST (Mon-Fri)")
+    logger.info("Paper trading sync: every 5 minutes (if enabled)")
 
     try:
         scheduler.start()
