@@ -57,7 +57,7 @@ sudo mkdir -p /etc/ssl/certs
 sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout /etc/ssl/private/algo-dashboard.key \
   -out /etc/ssl/certs/algo-dashboard.crt \
-  -subj "/C=IN/ST=YourState/L=YourCity/O=AlgoTrader/CN=YOUR_VM_IP"
+  -subj "/C=IN/ST=GUJRAT/L=SURAT/O=AlgoTrader/CN=161.118.177.247"
 
 # Set secure permissions
 sudo chmod 600 /etc/ssl/private/algo-dashboard.key
@@ -89,7 +89,7 @@ limit_req_zone  $binary_remote_addr zone=dashboard_api:10m    rate=30r/m;
 # Redirect HTTP to HTTPS
 server {
     listen 80;
-    server_name YOUR_VM_IP;
+    server_name 161.118.177.247;
 
     # Redirect all HTTP traffic to HTTPS
     return 301 https://$host$request_uri;
@@ -98,7 +98,7 @@ server {
 # HTTPS server
 server {
     listen 443 ssl http2;
-    server_name YOUR_VM_IP;
+    server_name 161.118.177.247;
 
     # SSL Certificate paths
     ssl_certificate     /etc/ssl/certs/algo-dashboard.crt;
@@ -218,40 +218,40 @@ sudo ufw status verbose
 ### **Step 6: Setup Dashboard as Systemd Service**
 
 ```bash
-# Copy service file template
-cd ~/zerodha-algo-trader
-cp algo-dashboard.service /tmp/algo-dashboard.service
+# Get your current username
+echo $USER
+# Output will be your username (e.g., ubuntu, aftab, etc.)
 
-# Edit service file with your username
-sudo nano /tmp/algo-dashboard.service
+# Replace YOUR_USERNAME with your actual username and create service file
+# Replace 'ubuntu' in the command below with your actual username from above
+cd ~/zerodha-algo-trader
+sed "s/YOUR_USERNAME/ubuntu/g" algo-dashboard.service | sudo tee /etc/systemd/system/algo-dashboard.service
+
+# Alternative: If your username is different (e.g., 'aftab'), use:
+# sed "s/YOUR_USERNAME/aftab/g" algo-dashboard.service | sudo tee /etc/systemd/system/algo-dashboard.service
 ```
 
-**Replace ALL occurrences of `YOUR_USERNAME` with your actual username (e.g., `ubuntu`):**
-
-- WorkingDirectory=/home/**ubuntu**/zerodha-algo-trader
-- Environment="PATH=/home/**ubuntu**/zerodha-algo-trader/venv/bin:..."
-- ExecStart=/home/**ubuntu**/zerodha-algo-trader/venv/bin/streamlit...
-
-**Save:** `Ctrl+O`, Enter, `Ctrl+X`
-
-```bash
-# Copy to systemd directory
-sudo cp /tmp/algo-dashboard.service /etc/systemd/system/
+**⚠️ Important:** Replace `ubuntu` in the command above with YOUR actual username (shown by `echo $USER`)
 
 # Reload systemd
+
 sudo systemctl daemon-reload
 
 # Enable service to start on boot
+
 sudo systemctl enable algo-dashboard
 
 # Start dashboard service
+
 sudo systemctl start algo-dashboard
 
 # Check service status
+
 sudo systemctl status algo-dashboard
 
 # Expected output: Active: active (running)
-```
+
+````
 
 ---
 
@@ -298,7 +298,7 @@ curl -I http://YOUR_VM_IP
 # Test HTTPS connection
 curl -k https://YOUR_VM_IP
 # Should return Streamlit HTML content
-```
+````
 
 **From your web browser:**
 

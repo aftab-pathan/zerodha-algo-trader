@@ -2,12 +2,14 @@
 login.py
 Daily login flow for Zerodha Kite Connect.
 Run this once each morning before market opens OR automate with Playwright.
+
+Note: Even in paper trading mode, authentication is required to fetch real market data.
 """
 
 import sys
 import logging
-from config.config import KITE_API_KEY, validate_config
-from core.kite_client import get_kite, complete_login
+from config.config import KITE_API_KEY, validate_config, PAPER_TRADING_MODE
+from core.kite_client import get_kite, complete_login, is_paper_mode
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(message)s")
@@ -21,13 +23,24 @@ def manual_login():
     login_url = kite.login_url()
 
     print("\n" + "═"*60)
-    print("  ZERODHA KITE LOGIN")
+    if is_paper_mode():
+        print("  ZERODHA KITE LOGIN (Paper Trading Mode)")
+        print("  🟡 Orders will be SIMULATED - No real trades")
+    else:
+        print("  ZERODHA KITE LOGIN (Live Trading Mode)")
+        print("  🔴 Real trades WILL be placed")
     print("═"*60)
     print(f"\n1. Open this URL in your browser:\n\n   {login_url}\n")
     print("2. Login with your Zerodha credentials + 2FA PIN")
     print("3. After redirect, copy the 'request_token' from the URL bar")
     print("   Example: https://yourapp.com/?request_token=abc123xyz&action=login&status=success")
-    print("            ↑ Copy: abc123xyz\n")
+    print("            ↑ Copy: abc123xyz")
+    
+    if is_paper_mode():
+        print("\n📌 Note: Authentication is required to fetch REAL market data for paper trading.")
+        print("   All orders will be simulated - no real capital at risk.\n")
+    else:
+        print()
 
     request_token = input("Paste request_token here: ").strip()
     if not request_token:
@@ -35,7 +48,12 @@ def manual_login():
         sys.exit(1)
 
     access_token = complete_login(request_token)
+    
     print(f"\n✅ Login successful! Access token saved (encrypted).")
+    if is_paper_mode():
+        print("   🟡 Paper Trading Active - Orders will be simulated")
+    else:
+        print("   🔴 Live Trading Active - Real trades will be placed")
     print("   The scheduler will use this token for today's trading.")
     return access_token
 

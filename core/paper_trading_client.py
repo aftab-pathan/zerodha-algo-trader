@@ -10,6 +10,8 @@ Features:
 - Paper positions and holdings tracking
 - P&L calculation
 - GTT (Good Till Triggered) simulation
+
+Note: Paper trading still requires Zerodha authentication to fetch real market data.
 """
 
 import os
@@ -18,7 +20,7 @@ import logging
 import json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
-from config.config import DATA_DIR
+from config.config import DATA_DIR, KITE_API_KEY, KITE_API_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +29,16 @@ class PaperTradingClient:
     """
     Paper trading simulator that mimics KiteConnect interface.
     All orders are simulated - no real trades placed.
+    
+    Maintains a real KiteConnect client internally for market data access.
     """
     
     def __init__(self, api_key: str = None):
-        self.api_key = api_key
+        self.api_key = api_key or KITE_API_KEY
         self.access_token = None
+        
+        # Real KiteConnect client for market data (lazy-loaded)
+        self._real_kite = None
         
         # Paper trading state stored in memory and persisted to file
         self.paper_state_file = os.path.join(DATA_DIR, "paper_state.json")
@@ -87,10 +94,33 @@ class PaperTradingClient:
         self.state["gtt_counter"] += 1
         return f"GTT{self.state['gtt_counter']}"
     
+    def _get_real_kite(self):
+        """Get or create real KiteConnect client for market data"""
+        if self._real_kite is None:
+            from kiteconnect import KiteConnect
+            self._real_kite = KiteConnect(api_key=self.api_key)
+            if self.access_token:
+                self._real_kite.set_access_token(self.access_token)
+        return self._real_kite
+    
+    def login_url(self) -> str:
+        """Get Zerodha login URL (delegates to real client for market data access)"""
+        return self._get_real_kite().login_url()
+    
+    def generate_session(self, request_token: str, api_secret: str) -> Dict:
+        """Generate session (delegates to real client for market data access)"""
+        data = self._get_real_kite().generate_session(request_token, api_secret=api_secret)
+        self.access_token = data["access_token"]
+        self._get_real_kite().set_access_token(self.access_token)
+        logger.info("[PAPER MODE] Authenticated for market data access (orders still simulated)")
+        return data
+    
     def set_access_token(self, access_token: str):
-        """Set access token (no-op for paper trading)"""
+        """Set access token for both paper and real client"""
         self.access_token = access_token
-        logger.info("[PAPER MODE] Access token set (simulated)")
+        if self._real_kite:
+            self._real_kite.set_access_token(access_token)
+        logger.info("[PAPER MODE] Access token set (simulated orders, real market data)")
     
     def profile(self) -> Dict:
         """Return simulated user profile"""
@@ -267,12 +297,9 @@ class PaperTradingClient:
         This is a pass-through to real Kite API since we need actual prices
         for paper trading simulation.
         """
-        # Import here to avoid circular dependency
-        from core.kite_client import get_kite as get_real_kite
         try:
-            # Get real market data for paper trading simulation
-            real_kite = get_real_kite()
-            return real_kite.ltp(instruments)
+            # Get real market data using internal real client
+            return self._get_real_kite().ltp(instruments)
         except Exception as e:
             logger.error(f"[PAPER MODE] Error getting LTP: {e}")
             # Return dummy data if real API fails
@@ -291,10 +318,8 @@ class PaperTradingClient:
         Get historical data. For paper trading, we need real market data.
         Pass-through to real Kite API.
         """
-        from core.kite_client import get_kite as get_real_kite
         try:
-            real_kite = get_real_kite()
-            return real_kite.historical_data(
+            return self._get_real_kite().historical_data(
                 instrument_token, from_date, to_date, interval, continuous, oi
             )
         except Exception as e:
@@ -303,20 +328,16 @@ class PaperTradingClient:
     
     def instruments(self, exchange: str = "NSE") -> List[Dict]:
         """Get instrument list - pass through to real API"""
-        from core.kite_client import get_kite as get_real_kite
         try:
-            real_kite = get_real_kite()
-            return real_kite.instruments(exchange)
+            return self._get_real_kite().instruments(exchange)
         except Exception as e:
             logger.error(f"[PAPER MODE] Error getting instruments: {e}")
             return []
     
     def quote(self, instruments: List[str]) -> Dict:
         """Get market quotes - pass through to real API for live data"""
-        from core.kite_client import get_kite as get_real_kite
         try:
-            real_kite = get_real_kite()
-            return real_kite.quote(instruments)
+            return self._get_real_kite().quote(instruments)
         except Exception as e:
             logger.error(f"[PAPER MODE] Error getting quotes: {e}")
             return {}
