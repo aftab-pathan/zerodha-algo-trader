@@ -63,6 +63,12 @@ PREFILTER_MIN_VOLUME = int(os.getenv("PREFILTER_MIN_VOLUME", "50000"))
 MAX_STAGE2_STOCKS    = int(os.getenv("MAX_STAGE2_STOCKS", "200"))
 CACHE_DURATION_HOURS = float(os.getenv("CACHE_DURATION_HOURS", "1.0"))
 
+# ─── API Rate Limiting (to avoid Cloudflare blocks) ──────────────────────────
+QUOTE_BATCH_SIZE     = int(os.getenv("QUOTE_BATCH_SIZE", "200"))      # Stocks per API call
+QUOTE_BATCH_DELAY    = float(os.getenv("QUOTE_BATCH_DELAY", "3.0"))   # Seconds between batches
+QUOTE_MAX_RETRIES    = int(os.getenv("QUOTE_MAX_RETRIES", "3"))       # Retry attempts on errors
+QUOTE_RETRY_DELAY    = float(os.getenv("QUOTE_RETRY_DELAY", "5.0"))   # Base retry delay
+
 # ─── Two-Tier Claude Scanning (Cost Optimization) ────────────────────────────
 # For bulk scans: Run fast technical strategies first, then Claude on top picks only
 ENABLE_TWO_TIER_CLAUDE = os.getenv("ENABLE_TWO_TIER_CLAUDE", "True").lower() in ("true", "1", "yes")

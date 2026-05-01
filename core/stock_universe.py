@@ -21,6 +21,10 @@ from config.config import (
     PREFILTER_MIN_VOLUME,
     MAX_STAGE2_STOCKS,
     CACHE_DURATION_HOURS,
+    QUOTE_BATCH_SIZE,
+    QUOTE_BATCH_DELAY,
+    QUOTE_MAX_RETRIES,
+    QUOTE_RETRY_DELAY,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,17 +97,49 @@ def apply_prefilters(symbols: List[str], config: Dict = None) -> List[str]:
     filtered = []
     kite = get_kite()
     
-    # Process in batches of 500 (Kite API limit for quote/ohlc)
-    batch_size = 500
+    # Process in batches (configurable batch size to avoid Cloudflare blocks)
+    batch_size = QUOTE_BATCH_SIZE
     for i in range(0, len(symbols), batch_size):
         batch = symbols[i:i + batch_size]
         exchange_symbols = [f"NSE:{s}" for s in batch]
         
-        try:
-            # Use ohlc quote for OHLC + volume data
-            quotes = kite.quote(exchange_symbols)
-            time.sleep(1.1)  # Rate limit: 1 req/sec for quote API
+        batch_num = i // batch_size + 1
+        total_batches = (len(symbols) + batch_size - 1) // batch_size
+        logger.info(f"Fetching quotes for batch {batch_num}/{total_batches} ({len(batch)} stocks)...")
+        
+        # Retry logic with exponential backoff for Cloudflare blocks
+        max_retries = QUOTE_MAX_RETRIES
+        retry_delay = QUOTE_RETRY_DELAY
+        quotes = None
+        
+        for attempt in range(max_retries):
+            try:
+                # Use ohlc quote for OHLC + volume data
+                quotes = kite.quote(exchange_symbols)
+                break  # Success, exit retry loop
+                
+            except Exception as e:
+                error_msg = str(e)
+                if "text/html" in error_msg or "cloudflare" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        logger.warning(f"Cloudflare challenge detected, waiting {wait_time}s before retry {attempt+2}/{max_retries}...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"Failed after {max_retries} retries: {e}")
+                        break
+                else:
+                    logger.warning(f"Error fetching quotes for batch {batch_num}: {e}")
+                    break
+        
+        if quotes is None:
+            logger.warning(f"Skipping batch {batch_num} due to API errors")
+            time.sleep(QUOTE_BATCH_DELAY)  # Still delay before next batch
+            continue
             
+        # Process successful quotes
+        try:
             for symbol in batch:
                 key = f"NSE:{symbol}"
                 if key not in quotes:
@@ -125,8 +161,10 @@ def apply_prefilters(symbols: List[str], config: Dict = None) -> List[str]:
                     filtered.append(symbol)
                     
         except Exception as e:
-            logger.warning(f"Error fetching quotes for batch {i//batch_size + 1}: {e}")
-            continue
+            logger.warning(f"Error processing quotes for batch {batch_num}: {e}")
+        
+        # Rate limit between batches
+        time.sleep(QUOTE_BATCH_DELAY)
     
     # Cap at max_stage2 to keep scan time reasonable
     if len(filtered) > max_stage2:
