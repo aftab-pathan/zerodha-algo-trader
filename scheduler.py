@@ -96,6 +96,20 @@ def job_paper_sync():
         logger.error(f"Paper trading sync failed: {e}")
 
 
+def job_position_sync():
+    """Sync system state with Kite every 5 minutes during market hours."""
+    logger.info("━━━ POSITION SYNC STARTING ━━━")
+    from core.sync_engine import sync_positions
+    try:
+        changes = sync_positions()
+        if changes.get("detected"):
+            logger.info(f"Sync changes detected: {changes['detected']}")
+        else:
+            logger.debug("Position sync: no changes detected")
+    except Exception as e:
+        logger.error(f"Position sync failed: {e}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Error handler
 # ─────────────────────────────────────────────────────────────────────────────
@@ -171,11 +185,3 @@ def start():
 if __name__ == "__main__":
     start()
 
-
-# ── Position Sync (added in v2) ───────────────────────────────────────────────
-def job_position_sync():
-    """Sync system state with Kite every 5 minutes during market hours."""
-    from core.sync_engine import sync_positions
-    changes = sync_positions()
-    if changes.get("detected"):
-        logger.info(f"Sync changes: {changes}")
