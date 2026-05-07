@@ -21,15 +21,10 @@ from config.config import (
 )
 from core.trading_engine import scan_and_trade, send_daily_summary
 from utils.telegram_notifier import notify_startup, notify_error
+from utils.ist_logging import setup_ist_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("logs/scheduler.log"),
-    ]
-)
+# Configure logging with IST timezone
+setup_ist_logging(level=logging.INFO, log_file="logs/scheduler.log")
 logger = logging.getLogger(__name__)
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -157,10 +152,15 @@ def start():
     scheduler.add_job(job_paper_sync, "interval", minutes=5,
                       id="paper_sync")
 
+    # Position sync — every 5 minutes during trading hours
+    scheduler.add_job(job_position_sync, "interval", minutes=5,
+                      id="position_sync")
+
     notify_startup()
     logger.info("Scheduler started. Press Ctrl+C to stop.")
     logger.info(f"Jobs: morning={SCAN_TIME_MORNING}, eod={SCAN_TIME_EOD} IST (Mon-Fri)")
     logger.info("Paper trading sync: every 5 minutes (if enabled)")
+    logger.info("Position sync: every 5 minutes (auto-sync with Kite)")
 
     try:
         scheduler.start()

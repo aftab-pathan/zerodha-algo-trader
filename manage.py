@@ -9,9 +9,10 @@ import json
 import argparse
 import logging
 from config.config import TRADING_CAPITAL
+from utils.ist_logging import setup_ist_logging
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s [%(levelname)s] %(message)s")
+# Configure logging with IST timezone
+setup_ist_logging(level=logging.INFO)
 
 
 def cmd_status(args):
@@ -146,6 +147,26 @@ def cmd_watchlist(args):
         print("  python manage.py watchlist --refresh  # Show default watchlist stocks\n")
 
 
+def cmd_sync(args):
+    """Manually sync app state with Kite."""
+    from core.sync_engine import sync_positions
+    print("\n🔄 Syncing with Kite dashboard...\n")
+    changes = sync_positions()
+    
+    if changes.get("detected"):
+        print("✅ Sync complete. Changes detected:")
+        for change in changes["detected"]:
+            print(f"   • {change}")
+    else:
+        print("✅ Sync complete. Everything in sync!")
+    
+    if changes.get("resolved"):
+        print("\n📊 Resolved:")
+        for res in changes["resolved"]:
+            print(f"   • {res}")
+    print()
+
+
 def cmd_summary():
     """Send daily summary to Telegram."""
     from core.trading_engine import send_daily_summary
@@ -172,6 +193,8 @@ def main():
 
     sub.add_parser("positions", help="Show open positions with LTP")
 
+    sub.add_parser("sync", help="Manually sync app state with Kite dashboard")
+
     p_wl = sub.add_parser("watchlist", help="Manage Zerodha watchlist")
     p_wl.add_argument("--refresh", action="store_true",
                       help="Clear and re-add default watchlist")
@@ -187,6 +210,7 @@ def main():
         "capital":   cmd_capital,
         "scan":      cmd_scan,
         "positions": cmd_positions,
+        "sync":      cmd_sync,
         "watchlist": cmd_watchlist,
         "summary":   lambda _: cmd_summary(),
     }

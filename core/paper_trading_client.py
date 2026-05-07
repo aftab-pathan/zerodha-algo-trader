@@ -33,6 +33,38 @@ class PaperTradingClient:
     Maintains a real KiteConnect client internally for market data access.
     """
     
+    # KiteConnect constants (required for API compatibility)
+    EXCHANGE_NSE = "NSE"
+    EXCHANGE_BSE = "BSE"
+    EXCHANGE_NFO = "NFO"
+    EXCHANGE_CDS = "CDS"
+    EXCHANGE_BFO = "BFO"
+    EXCHANGE_MCX = "MCX"
+    
+    PRODUCT_CNC = "CNC"
+    PRODUCT_MIS = "MIS"
+    PRODUCT_NRML = "NRML"
+    
+    ORDER_TYPE_MARKET = "MARKET"
+    ORDER_TYPE_LIMIT = "LIMIT"
+    ORDER_TYPE_SL = "SL"
+    ORDER_TYPE_SLM = "SL-M"
+    
+    TRANSACTION_TYPE_BUY = "BUY"
+    TRANSACTION_TYPE_SELL = "SELL"
+    
+    VARIETY_REGULAR = "regular"
+    VARIETY_AMO = "amo"
+    VARIETY_CO = "co"
+    VARIETY_ICEBERG = "iceberg"
+    
+    VALIDITY_DAY = "DAY"
+    VALIDITY_IOC = "IOC"
+    VALIDITY_TTL = "TTL"
+    
+    GTT_TYPE_OCO = "two-leg"
+    GTT_TYPE_SINGLE = "single"
+    
     def __init__(self, api_key: str = None):
         self.api_key = api_key or KITE_API_KEY
         self.access_token = None

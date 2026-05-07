@@ -10,9 +10,10 @@ import sys
 import logging
 from config.config import KITE_API_KEY, validate_config, PAPER_TRADING_MODE
 from core.kite_client import get_kite, complete_login, is_paper_mode
+from utils.ist_logging import setup_ist_logging
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s [%(levelname)s] %(message)s")
+# Configure logging with IST timezone
+setup_ist_logging(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

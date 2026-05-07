@@ -140,25 +140,53 @@ def apply_prefilters(symbols: List[str], config: Dict = None) -> List[str]:
             
         # Process successful quotes
         try:
+            passed_count = 0
+            failed_filters = {"price": 0, "volume": 0, "circuit": 0, "no_data": 0}
+            
             for symbol in batch:
                 key = f"NSE:{symbol}"
                 if key not in quotes:
+                    failed_filters["no_data"] += 1
                     continue
                 
                 q = quotes[key]
                 ltp = q.get("last_price", 0)
                 volume = q.get("volume", 0)
                 
-                # Check if stock is circuit-halted
+                # Check price filter
+                if not (min_price <= ltp <= max_price):
+                    failed_filters["price"] += 1
+                    continue
+                
+                # Check volume filter
+                if volume < min_volume:
+                    failed_filters["volume"] += 1
+                    continue
+                
+                # Check if stock is circuit-halted (only if circuit limits are valid)
                 upper_circuit = q.get("upper_circuit_limit", 0)
                 lower_circuit = q.get("lower_circuit_limit", 0)
-                is_halted = (ltp >= upper_circuit * 0.99) or (ltp <= lower_circuit * 1.01)
                 
-                # Apply filters
-                if (min_price <= ltp <= max_price and 
-                    volume >= min_volume and 
-                    not is_halted):
-                    filtered.append(symbol)
+                # Only check circuit if limits are properly set (non-zero)
+                is_halted = False
+                if upper_circuit > 0 and lower_circuit > 0:
+                    # Stock is halted if it's within 1% of circuit limits
+                    is_halted = (ltp >= upper_circuit * 0.99) or (ltp <= lower_circuit * 1.01)
+                
+                if is_halted:
+                    failed_filters["circuit"] += 1
+                    continue
+                
+                # Stock passed all filters
+                filtered.append(symbol)
+                passed_count += 1
+            
+            if passed_count > 0:
+                logger.info(f"Batch {batch_num}: {passed_count}/{len(batch)} stocks passed filters")
+            else:
+                logger.debug(f"Batch {batch_num} rejections: price={failed_filters['price']}, "
+                           f"volume={failed_filters['volume']}, circuit={failed_filters['circuit']}, "
+                           f"no_data={failed_filters['no_data']}")
                     
         except Exception as e:
             logger.warning(f"Error processing quotes for batch {batch_num}: {e}")

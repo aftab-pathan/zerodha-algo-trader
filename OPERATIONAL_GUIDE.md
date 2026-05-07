@@ -361,6 +361,20 @@ python manage.py scan --bulk --live
 python manage.py scan --dry-run
 ```
 
+#### **Sync with Kite (If Orders Were Cancelled)**
+
+```bash
+# Manually sync app state with Kite dashboard
+python manage.py sync
+
+# This is useful when:
+# - Orders were cancelled on Kite due to technical issues
+# - You manually closed positions on Kite app/web
+# - App shows positions that don't exist on Kite
+```
+
+**Note:** Position sync runs automatically every 5 minutes, but you can force a manual sync anytime.
+
 #### **Monitor Positions**
 
 ```bash
@@ -937,6 +951,28 @@ sudo journalctl -u algo-trader | grep "Order placed"
 sudo journalctl -u algo-trader | grep ERROR
 ```
 
+### **App Showing Wrong Positions**
+
+If `python manage.py positions` shows positions that were actually cancelled on Kite:
+
+```bash
+# Manually sync with Kite dashboard
+cd ~/zerodha-algo-trader
+source venv/bin/activate
+python manage.py sync
+```
+
+**Why this happens:**
+
+- Orders cancelled on Kite due to technical issues
+- Manual position closures on Kite app/web
+- Network interruptions during order placement
+
+**Prevention:**
+
+- Automatic sync runs every 5 minutes (enabled by default)
+- Can force manual sync anytime with `python manage.py sync`
+
 ### **High Memory/CPU Usage**
 
 ```bash
@@ -982,6 +1018,9 @@ python manage.py status
 
 # View positions
 python manage.py positions
+
+# Sync with Kite (if positions mismatch)
+python manage.py sync
 
 # Manual scan
 python manage.py scan --live
